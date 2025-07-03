@@ -16,7 +16,7 @@ yarn-debug.log*
 yarn-error.log*
 
 # environment
-venv
+venv/
 
 *.pyc
 *.pth
