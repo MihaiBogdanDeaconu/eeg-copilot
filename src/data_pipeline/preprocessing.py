@@ -1,6 +1,10 @@
+# In file: src/data_pipeline/preprocessing.py
+
 import mne
 import numpy as np
-from typing import Dict, Any
+import os
+from typing import Dict, Any, List
+from autoreject import AutoReject
 
 class EEGPreprocessor:
     """
@@ -10,9 +14,6 @@ class EEGPreprocessor:
     def __init__(self, config: Dict[str, Any]):
         """
         Initializes the preprocessor with settings from the config file.
-        
-        Args:
-            config (Dict[str, Any]): A dictionary containing preprocessing parameters.
         """
         self.config = config['preprocessing']
         self.sfreq = self.config['sfreq']
@@ -21,52 +22,53 @@ class EEGPreprocessor:
         self.notch_freq = self.config['notch_freq']
         self.epoch_duration_s = self.config['epoch_duration_s']
         self.epoch_overlap_s = self.config['epoch_overlap_s']
-        self.reject_threshold = self.config['reject_threshold_uv'] * 1e-6  # Convert uV to V
-        self.montage = mne.channels.make_standard_montage(self.config['montage'])
+        # We no longer load a standard montage here.
+
+    def _create_dummy_montage(self, ch_names: List[str]) -> mne.channels.DigMontage:
+        """
+        Creates a dummy montage with arbitrary 3D positions to satisfy autoreject.
+        The exact positions are not critical; their existence and uniqueness are.
+        """
+        n_channels = len(ch_names)
+        # Create positions arranged in a circle on the XY plane
+        radius = 0.1  # 10 cm
+        angles = np.linspace(0, 2 * np.pi, n_channels, endpoint=False)
+        positions = np.array([
+            [radius * np.cos(a), radius * np.sin(a), 0] for a in angles
+        ])
+        
+        ch_pos_dict = dict(zip(ch_names, positions))
+        return mne.channels.make_dig_montage(ch_pos=ch_pos_dict, coord_frame='head')
 
     def _universal_reader(self, file_path: str) -> mne.io.Raw:
         """
         Flexible MNE reader that attempts to load various raw file formats.
-        As per blueprint, this handles the data extraction problem.
         """
-        # Add other readers as needed based on identified file formats
         readers = {
             '.edf': mne.io.read_raw_edf,
             '.bdf': mne.io.read_raw_bdf,
             '.gdf': mne.io.read_raw_gdf,
-            # '.vhdr': mne.io.read_raw_brainvision, # Example for BrainVision
-            # '.dat': mne.io.read_raw_nicolet,     # Example for Nicolet
         }
-        
-        file_extension = file_path[file_path.rfind('.'):].lower()
-        
+        file_extension = os.path.splitext(file_path)[1].lower()
         if file_extension in readers:
             try:
-                raw = readers[file_extension](file_path, preload=True, verbose=False)
-                return raw
+                return readers[file_extension](file_path, preload=True, verbose=False)
             except Exception as e:
                 raise IOError(f"Failed to read {file_path} with MNE: {e}")
         else:
-            raise ValueError(f"Unsupported file format: {file_extension}. Please add a reader for it.")
+            raise ValueError(f"Unsupported file format: {file_extension}")
 
     def preprocess(self, file_path: str) -> np.ndarray:
         """
-        Executes the full preprocessing pipeline on a single EEG file.
-        
-        Args:
-            file_path (str): The path to the raw EEG file.
-            
-        Returns:
-            np.ndarray: A numpy array of shape (n_epochs, n_channels, n_times)
-                        containing clean, normalized data.
+        Executes the full preprocessing pipeline using a custom-generated montage.
         """
         # 1. Data Loading
         raw = self._universal_reader(file_path)
+        raw.set_channel_types({ch: 'eeg' for ch in raw.ch_names})
 
-        # 2. Montage Selection & Referencing
-        # Select only channels present in the standard montage
-        raw.pick_channels([ch for ch in raw.ch_names if ch in self.montage.ch_names])
-        raw.set_montage(self.montage, on_missing='ignore')
+        # 2. **THE NEW FIX**: Create and set a dummy montage
+        dummy_montage = self._create_dummy_montage(raw.ch_names)
+        raw.set_montage(dummy_montage)
         
         # 3. Filtering
         raw.filter(self.l_freq, self.h_freq, fir_design='firwin', verbose=False)
@@ -75,13 +77,10 @@ class EEGPreprocessor:
         # 4. Resampling
         raw.resample(self.sfreq, npad='auto', verbose=False)
 
-        # 5. Re-referencing
-        raw.set_eeg_reference(ref_channels='average', projection=False, verbose=False)
+        # 5. Re-referencing (optional, but good practice)
+        raw.set_eeg_reference(ref_channels='average', projection=True, verbose=False)
 
         # 6. Epoching
-        epoch_len_samples = int(self.epoch_duration_s * self.sfreq)
-        epoch_overlap_samples = int(self.epoch_overlap_s * self.sfreq)
-        
         epochs = mne.make_fixed_length_epochs(
             raw, 
             duration=self.epoch_duration_s, 
@@ -91,19 +90,19 @@ class EEGPreprocessor:
             verbose=False
         )
         
-        # 7. Preliminary Artifact Rejection
-        reject_criteria = dict(eeg=self.reject_threshold)
-        epochs.drop_bad(reject=reject_criteria, verbose=False)
-        
         if len(epochs) == 0:
-            return np.array([]) # Return empty array if no good epochs found
+            return np.array([])
 
-        # 8. Normalization (Epoch-wise Z-score)
-        epochs_data = epochs.get_data() # (n_epochs, n_channels, n_times)
+        # 7. Adaptive Artifact Rejection with AutoReject
+        # This will now succeed as the epochs object has channel locations.
+        ar = AutoReject(picks='eeg', n_interpolate=[1, 2, 4], n_jobs=-1, random_state=42, verbose=False)
+        epochs_clean = ar.fit_transform(epochs)
+
+        # 8. Normalization
+        epochs_data = epochs_clean.get_data(copy=False)
         
         mean = np.mean(epochs_data, axis=2, keepdims=True)
         std = np.std(epochs_data, axis=2, keepdims=True)
-        # Avoid division by zero for flat channels
         std[std == 0] = 1 
         
         normalized_epochs = (epochs_data - mean) / std

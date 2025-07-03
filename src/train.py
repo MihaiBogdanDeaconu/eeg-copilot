@@ -6,6 +6,7 @@ import argparse
 import os
 from tqdm import tqdm
 from typing import Dict, Any
+import json
 
 from data_pipeline.dataset import EEGDataset
 from model_architecture.mtl_framework import MTLModel
@@ -14,20 +15,27 @@ def get_config(config_path: str) -> Dict[str, Any]:
     with open(config_path, 'r') as f:
         return yaml.safe_load(f)
 
+# In file: src/train.py
+
 def collate_fn(batch):
-    """Custom collate_fn to handle file-level batching from our Dataset."""
-    # Our dataset __getitem__ returns a dictionary with all epochs from one file.
-    # The batch will be a list of these dictionaries.
-    # We need to concatenate the epochs and labels from all files in the batch.
-    
-    all_data = torch.cat([item['data'] for item in batch if item['data'].nelement() > 0], dim=0)
+    """
+    Robust collate_fn that handles cases where some files in a batch yield no valid epochs.
+    """
+    # Filter out items that have no data
+    valid_items = [item for item in batch if item['data'].nelement() > 0]
+
+    # If the entire batch was bad and we have no valid items, return an empty dict
+    if not valid_items:
+        return {'data': torch.empty(0), 'labels': {}}
+
+    # Proceed with concatenation if we have at least one valid item
+    all_data = torch.cat([item['data'] for item in valid_items], dim=0)
     
     all_labels = {}
-    if all_data.nelement() > 0:
-        tasks = batch[0]['labels'].keys()
-        for task in tasks:
-            all_labels[task] = torch.cat([item['labels'][task] for item in batch if item['data'].nelement() > 0], dim=0)
-            
+    tasks = valid_items[0]['labels'].keys()
+    for task in tasks:
+        all_labels[task] = torch.cat([item['labels'][task] for item in valid_items], dim=0)
+        
     return {'data': all_data, 'labels': all_labels}
 
 
@@ -83,12 +91,18 @@ def main(config_path: str):
 
     print(f"Using device: {device}")
 
-    # --- Data Loading ---
-    # NOTE: In a real scenario, you'd have a much larger list of files.
-    # Using placeholder paths from config for demonstration.
-    print("Loading datasets...")
-    train_dataset = EEGDataset(config['paths']['train_files'], config)
-    val_dataset = EEGDataset(config['paths']['val_files'], config)
+    split_file = config['paths']['dataset_split_file']
+    print(f"Loading dataset splits from {split_file}")
+    with open(split_file, 'r') as f:
+        file_splits = json.load(f)
+    
+    train_files = file_splits['train']
+    val_files = file_splits['validation']
+    # test_files = file_splits['test'] # Reserved for final evaluation
+
+    print("Initializing datasets with real annotations...")
+    train_dataset = EEGDataset(train_files, config)
+    val_dataset = EEGDataset(val_files, config)
     
     # We use a batch size of 1 at the DataLoader level because each "item" is a full file.
     # The actual batch of epochs is formed in the collate_fn.
