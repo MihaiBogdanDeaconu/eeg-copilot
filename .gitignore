@@ -19,5 +19,4 @@ yarn-error.log*
 venv
 
 *.pyc
-
 *.pth
