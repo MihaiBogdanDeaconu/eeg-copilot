@@ -84,7 +84,12 @@ def main(config_path: str):
     val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=1, shuffle=False, collate_fn=collate_fn, num_workers=num_workers)
 
     # --- Model, Optimizer, Scheduler ---
-    model = MTLModel(config).to(device)
+    model = MTLModel(config)
+    if torch.cuda.device_count() > 1:
+        print(f"Let's use {torch.cuda.device_count()} GPUs!")
+        # 2. Wrap the model in DataParallel
+        model = nn.DataParallel(model)
+    model.to(device)
     optimizer = optim.AdamW(model.parameters(), lr=config['training']['learning_rate'], weight_decay=config['training']['weight_decay'])
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=config['training']['lr_scheduler_factor'], patience=config['training']['lr_scheduler_patience'])
     os.makedirs(config['paths']['model_save_dir'], exist_ok=True)

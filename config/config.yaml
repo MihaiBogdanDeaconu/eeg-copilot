@@ -1,7 +1,7 @@
 # In file: config/config.yaml
 
 paths:
-  chb_mit_dir: '/Users/mihaibogdandeaconu/Documents/data/CHB-MIT'
+  chb_mit_dir: '/shares/CC_v_Val_FV_Gen3_all/VIDT_DL/data/cnn_training/projects/smart_data_selection/town_signs/data/public/chbmit'
   dataset_split_file: 'config/dataset_split.json'
   output_dir: 'outputs/'
   model_save_dir: 'saved_models/'
@@ -24,7 +24,7 @@ model:
   cnn_out_channels: 64
   transformer_heads: 8
   transformer_layers: 6
-  transformer_ff_dim: 1024
+  transformer_ff_dim: 1024 #was 1024!
   dropout: 0.2
   tasks:
     rhythm:
@@ -42,7 +42,7 @@ model:
 
 training:
   epochs: 50
-  batch_size: 16
+  batch_size: 4
   learning_rate: 0.0001
   weight_decay: 0.01
   lr_scheduler_factor: 0.5
@@ -58,4 +58,4 @@ training:
     # Use n-1 cores for data loading, leaving one for the main process.
     # For an 8-core machine, use 7. For a 4-core, use 3.
     # Set to 0 to disable multi-processing if you encounter issues.
-    num_workers: 4
+    num_workers: 8

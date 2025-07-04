@@ -3,6 +3,8 @@
 import torch
 import torch.nn as nn
 import math
+from typing import Tuple, Optional # <-- 1. IMPORT THIS
+
 
 class PositionalEncoding(nn.Module):
     """Standard sinusoidal positional encoding."""
@@ -78,7 +80,7 @@ class CNNTransformerBackbone(nn.Module):
         # --- Classification Token ---
         self.cls_token = nn.Parameter(torch.zeros(1, 1, self.d_model))
 
-    def forward(self, x: torch.Tensor, return_attention: bool = False) -> tuple[torch.Tensor, torch.Tensor | None]:
+    def forward(self, x: torch.Tensor, return_attention: bool = False) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         """
         Args:
             x (torch.Tensor): Input EEG data of shape (Batch, Channels, Timepoints)

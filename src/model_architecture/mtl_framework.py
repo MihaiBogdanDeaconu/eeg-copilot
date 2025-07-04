@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from typing import Dict, Any
+from typing import Dict, Any, Tuple, Optional
 
 from .cnn_transformer import CNNTransformerBackbone
 
@@ -30,7 +31,7 @@ class MTLModel(nn.Module):
         for task_name, task_config in tasks.items():
             self.heads[task_name] = nn.Linear(backbone_out_dim, task_config['num_classes'])
             
-    def forward(self, x: torch.Tensor, return_attention: bool = False) -> tuple[dict[str, torch.Tensor], torch.Tensor | None]:
+    def forward(self, x: torch.Tensor, return_attention: bool = False) -> Tuple[Dict[str, torch.Tensor], Optional[torch.Tensor]]:
         """
         Performs a forward pass through the backbone and all task heads.
         
