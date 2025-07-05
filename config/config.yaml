@@ -58,4 +58,4 @@ training:
     # Use n-1 cores for data loading, leaving one for the main process.
     # For an 8-core machine, use 7. For a 4-core, use 3.
     # Set to 0 to disable multi-processing if you encounter issues.
-    num_workers: 8
+    num_workers: 16
