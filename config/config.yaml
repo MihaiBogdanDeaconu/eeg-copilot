@@ -27,18 +27,23 @@ model:
   transformer_ff_dim: 1024 #was 1024!
   dropout: 0.2
   tasks:
-    rhythm:
-      num_classes: 5
-      class_names: ['Delta', 'Theta', 'Alpha', 'Beta', 'Gamma']
+    # PRIMARY TASK FOR HEADLINE METRICS
+    seizure_binary:
+      num_classes: 2
+      class_names: ['non-seizure', 'seizure']
+
+    # SECONDARY, MORE ADVANCED TASK
+    epileptiform_event:
+      num_classes: 6
+      class_names: ['bkgd', 'gnsz', 'fnsz', 'spsw', 'gped', 'pled']
+      # bkgd: background, gnsz: generalized seizure, fnsz: focal seizure,
+      # spsw: spike and wave, gped: generalized periodic discharges, pled: periodic lateralized discharges
+      
+    # AUXILIARY TASK
     artifact:
-      num_classes: 4
-      class_names: ['Ocular', 'EMG', 'ECG', 'Electrode Pop']
-    pathology:
-      num_classes: 2 # Now correctly defined as Seizure vs. Non-Seizure
-      class_names: ['Non-Seizure', 'Seizure']
-    localization:
       num_classes: 5
-      class_names: ['None', 'Frontal', 'Temporal', 'Parietal', 'Occipital']
+      class_names: ['eyem', 'chew', 'shiv', 'musc', 'elpp']
+      # eyem: eye movement, chew: chewing, shiv: shivering, musc: muscle, elpp: electrode pop
 
 training:
   epochs: 50
