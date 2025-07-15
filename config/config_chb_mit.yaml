@@ -1,14 +1,19 @@
 # ===================================================================
-# FINAL SOTA CONFIGURATION
+# FINAL SOTA CONFIGURATION FOR CHB-MIT
 # ===================================================================
 
 paths:
-  # This path is NOT used by the local preprocess script.
-  # It will be used on the server to locate the preprocessed .npz files.
-  preprocessed_data_dir: '/path/on/server/to/your/preprocessed_data/'
+  # This path is used by the local preprocessing script
+  chb_mit_raw_dir: 'C:\Temp\chbmit_tmp\physionet.org\files\chbmit\1.0.0'
+  
+  # This path is where the local script will SAVE the processed data
+  chb_mit_processed_dir: 'C:\Temp\chbmit_processed'
+  
+  # This path is used by the TRAINING server
+  preprocessed_data_dir: '/path/on/server/to/chbmit_processed'
   
   # These paths are used by helper scripts (prepare_dataset, evaluate)
-  dataset_split_file: 'config/dataset_split.json'
+  dataset_split_file: 'config/dataset_split_chbmit.json'
   output_dir: 'outputs/'
   model_save_dir: 'saved_models/'
 
@@ -16,7 +21,7 @@ preprocessing:
   sfreq: 256
   l_freq: 0.5
   h_freq: 70.0
-  notch_freq: 50.0 # Use 50.0 for Europe
+  notch_freq: 60.0 # Use 50.0 for Europe
   epoch_duration_s: 10
   epoch_overlap_s: 5
   montage: 'standard_1020'
@@ -27,32 +32,26 @@ model:
   cnn_out_channels: 64
   transformer_heads: 8
   transformer_layers: 6
-  # Using the memory-optimized setting to prevent errors on the server
-  transformer_ff_dim: 1024
+  transformer_ff_dim: 512
   dropout: 0.2
   tasks:
     seizure_binary:
       num_classes: 2
       class_names: ['non-seizure', 'seizure']
-    epileptiform_event:
-      num_classes: 6
-      class_names: ['bkgd', 'gnsz', 'fnsz', 'spsw', 'gped', 'pled']
     artifact:
-      num_classes: 5
-      class_names: ['eyem', 'chew', 'shiv', 'musc', 'elpp']
-
+      num_classes: 2 # Artifact vs. Not Artifact
+      class_names: ['clean', 'artifact']
+    # We remove other heads as CHB-MIT doesn't have those labels
+    
 training:
   epochs: 50
-  batch_size: 64 # A good starting point for a 4x T4 server
+  batch_size: 64
   learning_rate: 0.0001
   weight_decay: 0.01
   lr_scheduler_factor: 0.5
   lr_scheduler_patience: 5
   loss_weights:
-    # Corrected keys to match the 'tasks' section
     seizure_binary: 2.0
-    epileptiform_event: 1.0
     artifact: 1.5
   data_loader:
-    # A good starting point for a powerful server.
-    num_workers: 16
+    num_workers: 8
