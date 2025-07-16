@@ -4,44 +4,47 @@
 
 paths:
   # This path is used by the local preprocessing script
-  chb_mit_raw_dir: 'C:\Temp\chbmit_tmp\physionet.org\files\chbmit\1.0.0'
+  chb_mit_raw_dir: '/shares/CC_v_Val_FV_Gen3_all/VIDT_DL/data/cnn_training/projects/smart_data_selection/town_signs/data/public/chbmit'
   
   # This path is where the local script will SAVE the processed data
-  chb_mit_processed_dir: 'C:\Temp\chbmit_processed'
+  chb_mit_processed_dir: '/shares/CC_v_Val_FV_Gen3_all/VIDT_DL/data/cnn_training/projects/smart_data_selection/town_signs/data/public/chbmit_processed3'
   
   # This path is used by the TRAINING server
-  preprocessed_data_dir: '/path/on/server/to/chbmit_processed'
+  preprocessed_data_dir: '/shares/CC_v_Val_FV_Gen3_all/VIDT_DL/data/cnn_training/projects/smart_data_selection/town_signs/data/public/chbmit_processed3'
   
   # These paths are used by helper scripts (prepare_dataset, evaluate)
   dataset_split_file: 'config/dataset_split_chbmit.json'
   output_dir: 'outputs/'
   model_save_dir: 'saved_models/'
 
+  log_file: 'outputs/training_log.csv'
+
 preprocessing:
   sfreq: 256
   l_freq: 0.5
   h_freq: 70.0
-  notch_freq: 60.0 # Use 50.0 for Europe
+  notch_freq: 60.0 # Use 50.0 for Europe if needed
   epoch_duration_s: 10
   epoch_overlap_s: 5
   montage: 'standard_1020'
 
+# The 'model' and 'training' sections are not used by this script,
+# but are kept here for consistency for the training phase.
 model:
   num_eeg_channels: 21
   sequence_length: 2560
   cnn_out_channels: 64
   transformer_heads: 8
   transformer_layers: 6
-  transformer_ff_dim: 512
+  transformer_ff_dim: 1024
   dropout: 0.2
   tasks:
     seizure_binary:
       num_classes: 2
       class_names: ['non-seizure', 'seizure']
     artifact:
-      num_classes: 2 # Artifact vs. Not Artifact
+      num_classes: 2
       class_names: ['clean', 'artifact']
-    # We remove other heads as CHB-MIT doesn't have those labels
     
 training:
   epochs: 50
@@ -54,4 +57,4 @@ training:
     seizure_binary: 2.0
     artifact: 1.5
   data_loader:
-    num_workers: 8
+    num_workers: 4

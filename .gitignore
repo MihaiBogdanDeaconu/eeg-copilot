@@ -5,6 +5,7 @@ node_modules/
 dist/
 build/
 saved_models/
+outputs/
 
 # OS files
 .DS_Store
